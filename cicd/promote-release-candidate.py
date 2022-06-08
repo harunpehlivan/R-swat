@@ -33,7 +33,7 @@ def get_repo():
     ''' Retrieve the repo part of the git URL '''
     cmd = ['git', 'remote', 'get-url', 'origin']
     repo = subprocess.check_output(cmd).decode('utf-8').strip()
-    repo = re.search(r'github.com[/:](.+?)\.git$', repo).group(1)
+    repo = re.search(r'github.com[/:](.+?)\.git$', repo)[1]
     return repo
 
 
@@ -45,15 +45,21 @@ def create_release(tag_name, target_commitish, rc_release):
 
     '''
     res = requests.post(
-        'https://api.github.com/repos/{}/releases'.format(get_repo()),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'),
-        json=dict(tag_name=tag_name,
-                  target_commitish=target_commitish,
-                  name=re.sub(r'(v\d+\.\d+\.\d+)-rc', r'\1', rc_release['name']),
-                  body=re.sub(r'(v\d+\.\d+\.\d+)-rc', r'\1', rc_release['body']),
-                  draft=False, prerelease=False)
+        f'https://api.github.com/repos/{get_repo()}/releases',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+        json=dict(
+            tag_name=tag_name,
+            target_commitish=target_commitish,
+            name=re.sub(r'(v\d+\.\d+\.\d+)-rc', r'\1', rc_release['name']),
+            body=re.sub(r'(v\d+\.\d+\.\d+)-rc', r'\1', rc_release['body']),
+            draft=False,
+            prerelease=False,
+        ),
     )
+
 
     if res.status_code >= 400:
         raise RuntimeError(res.json())
@@ -67,14 +73,16 @@ def copy_assets(url, assets):
     ''' Copy assets from other release to the upload url '''
     for asset in assets:
         asset_url = asset['browser_download_url']
-        print(' > {}'.format(asset['name']))
+        print(f" > {asset['name']}")
         with urlopen(asset_url) as asset_file:
             requests.post(
-                '{}?name={}'.format(url, quote(asset['name'])),
-                headers={'Authorization': 'token {}'.format(GITHUB_TOKEN),
-                         'Accept': 'application/vnd.github.v3+json',
-                         'Content-Type': 'application/octet-stream'},
-                data=asset_file.read()
+                f"{url}?name={quote(asset['name'])}",
+                headers={
+                    'Authorization': f'token {GITHUB_TOKEN}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/octet-stream',
+                },
+                data=asset_file.read(),
             )
 
 
@@ -105,16 +113,24 @@ def delete_release(tag_name):
     ''' Remove local and remote tags for the given release '''
     # Delete release
     res = requests.get(
-        'https://api.github.com/repos/{}/releases/tags/{}'.format(get_repo(), tag_name),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'))
+        f'https://api.github.com/repos/{get_repo()}/releases/tags/{tag_name}',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+    )
+
 
     if res.status_code < 400:
         release_url = res.json()['url']
         res = requests.delete(
             release_url,
-            headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                         Accept='application/vnd.github.v3+json'))
+            headers=dict(
+                Authorization=f'token {GITHUB_TOKEN}',
+                Accept='application/vnd.github.v3+json',
+            ),
+        )
+
 
     # Delete tags
     del_tags = [tag_name, tag_name.replace('-rc', '-snapshot')]
@@ -125,7 +141,7 @@ def delete_release(tag_name):
         if tag in del_tags:
             cmd = ['git', 'tag', '-d', tag]
             subprocess.check_call(cmd)
-            cmd = ['git', 'push', 'origin', ':refs/tags/{}'.format(tag)]
+            cmd = ['git', 'push', 'origin', f':refs/tags/{tag}']
             subprocess.check_call(cmd)
             break
 
@@ -139,14 +155,18 @@ def checkout_main(tag=None):
 def get_release(tag_name):
     ''' Retrieve the upload URL for the given tag '''
     res = requests.get(
-        'https://api.github.com/repos/{}/releases/tags/{}'.format(get_repo(), tag_name),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'))
+        f'https://api.github.com/repos/{get_repo()}/releases/tags/{tag_name}',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+    )
+
 
     if res.status_code < 400:
         return res.json()
 
-    raise RuntimeError('Could not locate tag name: {}'.format(tag_name))
+    raise RuntimeError(f'Could not locate tag name: {tag_name}')
 
 
 def get_release_sha(tag_name):

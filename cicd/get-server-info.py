@@ -35,11 +35,11 @@ def main(args):
 
     '''
     if not os.path.isfile(args.log_file):
-        print_err('ERROR: File not found: {}'.format(args.log_file))
+        print_err(f'ERROR: File not found: {args.log_file}')
         sys.exit(1)
 
     iters = 0
-    for i in range(args.retries):
+    for _ in range(args.retries):
         iters += 1
         time.sleep(args.interval)
         if iters > args.retries:
@@ -48,20 +48,19 @@ def main(args):
 
         with open(args.log_file, 'r') as logf:
             txt = logf.read()
-            m = re.search(r'===\s+.+?(\S+):(\d+)\s+.+?\s+.+?:(\d+)\s+===', txt)
-            if m:
-                hostname = m.group(1)
-                binary_port = m.group(2)
-                http_port = m.group(3)
+            if m := re.search(
+                r'===\s+.+?(\S+):(\d+)\s+.+?\s+.+?:(\d+)\s+===', txt
+            ):
+                hostname = m[1]
+                binary_port = m[2]
+                http_port = m[3]
 
-                sys.stdout.write('CASHOST={} '.format(hostname))
-                sys.stdout.write('CAS_HOST={} '.format(hostname))
-                sys.stdout.write('CAS_BINARY_PORT={} '.format(binary_port))
-                sys.stdout.write('CAS_HTTP_PORT={} '.format(http_port))
-                sys.stdout.write('CAS_BINARY_URL=cas://{}:{} '.format(hostname,
-                                                                      binary_port))
-                sys.stdout.write('CAS_HTTP_URL=http://{}:{} '.format(hostname,
-                                                                     http_port))
+                sys.stdout.write(f'CASHOST={hostname} ')
+                sys.stdout.write(f'CAS_HOST={hostname} ')
+                sys.stdout.write(f'CAS_BINARY_PORT={binary_port} ')
+                sys.stdout.write(f'CAS_HTTP_PORT={http_port} ')
+                sys.stdout.write(f'CAS_BINARY_URL=cas://{hostname}:{binary_port} ')
+                sys.stdout.write(f'CAS_HTTP_URL=http://{hostname}:{http_port} ')
 
                 if 'CASPROTOCOL' in os.environ or 'CAS_PROTOCOL' in os.environ:
                     protocol = os.environ.get('CASPROTOCOL',
@@ -69,50 +68,40 @@ def main(args):
                     if protocol == 'cas':
                         sys.stdout.write('CASPROTOCOL=cas ')
                         sys.stdout.write('CAS_PROTOCOL=cas ')
-                        sys.stdout.write('CASPORT={} '.format(binary_port))
-                        sys.stdout.write('CAS_PORT={} '.format(binary_port))
-                        sys.stdout.write('CASURL=cas://{}:{} '.format(hostname,
-                                                                      binary_port))
-                        sys.stdout.write('CAS_URL=cas://{}:{} '.format(hostname,
-                                                                       binary_port))
+                        sys.stdout.write(f'CASPORT={binary_port} ')
+                        sys.stdout.write(f'CAS_PORT={binary_port} ')
+                        sys.stdout.write(f'CASURL=cas://{hostname}:{binary_port} ')
+                        sys.stdout.write(f'CAS_URL=cas://{hostname}:{binary_port} ')
                     else:
-                        sys.stdout.write('CASPROTOCOL={} '.format(protocol))
-                        sys.stdout.write('CAS_PROTOCOL={} '.format(protocol))
-                        sys.stdout.write('CASPORT={} '.format(http_port))
-                        sys.stdout.write('CAS_PORT={} '.format(http_port))
-                        sys.stdout.write('CASURL={}://{}:{} '.format(protocol, hostname,
-                                                                     http_port))
-                        sys.stdout.write('CAS_URL={}://{}:{} '.format(protocol, hostname,
-                                                                      http_port))
+                        sys.stdout.write(f'CASPROTOCOL={protocol} ')
+                        sys.stdout.write(f'CAS_PROTOCOL={protocol} ')
+                        sys.stdout.write(f'CASPORT={http_port} ')
+                        sys.stdout.write(f'CAS_PORT={http_port} ')
+                        sys.stdout.write(f'CASURL={protocol}://{hostname}:{http_port} ')
+                        sys.stdout.write(f'CAS_URL={protocol}://{hostname}:{http_port} ')
 
                 elif 'REQUIRES_TK' in os.environ:
                     if os.environ.get('REQUIRES_TK', '') == 'true':
                         sys.stdout.write('CASPROTOCOL=cas ')
                         sys.stdout.write('CAS_PROTOCOL=cas ')
-                        sys.stdout.write('CASPORT={} '.format(binary_port))
-                        sys.stdout.write('CAS_PORT={} '.format(binary_port))
-                        sys.stdout.write('CASURL=cas://{}:{} '.format(hostname,
-                                                                      binary_port))
-                        sys.stdout.write('CAS_URL=cas://{}:{} '.format(hostname,
-                                                                       binary_port))
+                        sys.stdout.write(f'CASPORT={binary_port} ')
+                        sys.stdout.write(f'CAS_PORT={binary_port} ')
+                        sys.stdout.write(f'CASURL=cas://{hostname}:{binary_port} ')
+                        sys.stdout.write(f'CAS_URL=cas://{hostname}:{binary_port} ')
                     else:
                         sys.stdout.write('CASPROTOCOL=http ')
                         sys.stdout.write('CAS_PROTOCOL=http ')
-                        sys.stdout.write('CASPORT={} '.format(http_port))
-                        sys.stdout.write('CAS_PORT={} '.format(http_port))
-                        sys.stdout.write('CASURL=http://{}:{} '.format(hostname,
-                                                                       http_port))
-                        sys.stdout.write('CAS_URL=http://{}:{} '.format(hostname,
-                                                                        http_port))
+                        sys.stdout.write(f'CASPORT={http_port} ')
+                        sys.stdout.write(f'CAS_PORT={http_port} ')
+                        sys.stdout.write(f'CASURL=http://{hostname}:{http_port} ')
+                        sys.stdout.write(f'CAS_URL=http://{hostname}:{http_port} ')
 
                 # Get CAS server pid
-                cmd = ('ssh -x -o StrictHostKeyChecking=no '
-                       '-o UserKnownHostsFile=/dev/null {} '
-                       'ps ax | grep {} | grep -v grep | head -1'
-                       ).format(hostname, '.'.join(args.log_file.split('.')[:-1]))
+                cmd = f"ssh -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {hostname} ps ax | grep {'.'.join(args.log_file.split('.')[:-1])} | grep -v grep | head -1"
+
                 pid = subprocess.check_output(cmd, shell=True) \
                                 .decode('utf-8').strip().split(' ', 1)[0]
-                sys.stdout.write('CAS_PID={} '.format(pid))
+                sys.stdout.write(f'CAS_PID={pid} ')
 
                 # Write pid file
                 if args.pid_file:

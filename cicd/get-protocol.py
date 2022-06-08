@@ -24,9 +24,8 @@ def main(args):
     init = glob.glob(os.path.join(args.root, 'DESCRIPTION'))[0]
     with open(init, 'r') as init_in:
         for line in init_in:
-            m = re.match(r'''TKVersion\s*:\s*(\S+)''', line)
-            if m:
-                version = m.group(1)
+            if m := re.match(r'''TKVersion\s*:\s*(\S+)''', line):
+                version = m[1]
                 if version == 'none':
                     version = None
                 break

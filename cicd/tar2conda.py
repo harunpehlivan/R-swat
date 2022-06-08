@@ -102,9 +102,8 @@ def get_version(pkg_dir):
     '''  Retrieve version number from setup.py '''
     with open(os.path.join(pkg_dir, 'DESCRIPTION'), 'r') as desc_in:
         for line in desc_in:
-            m = re.match(r'^Version\s*:\s*(\S+)', line)
-            if m:
-                return m.group(1)
+            if m := re.match(r'^Version\s*:\s*(\S+)', line):
+                return m[1]
     raise RuntimeError('Could not find version in DESCRIPTION file.')
 
 
@@ -131,9 +130,7 @@ def expand_wildcards(vals):
             val = re.sub(r'\.?\*$', '', val)
             next_val = [int(x) for x in val.split('.')]
             next_val[-1] += 1
-            out.append('>={},<={}a0'.format(
-                val,
-                '.'.join('{}'.format(x) for x in next_val)))
+            out.append(f">={val},<={'.'.join(f'{x}' for x in next_val)}a0")
         else:
             out.append(val)
     return out
@@ -152,8 +149,8 @@ def check_version(pkg_ver, specs):
                     oper = '=='
                 elif oper == '':
                     oper = '>='
-                or_expr.append('{} {} {}'.format(pkg_ver, oper, version_key(ver)))
-            expr.append('({})'.format(' or '.join(or_expr)))
+                or_expr.append(f'{pkg_ver} {oper} {version_key(ver)}')
+            expr.append(f"({' or '.join(or_expr)})")
         if eval(' and '.join(expr)):
             return True
     return False
@@ -177,17 +174,21 @@ def get_supported_versions(platform, r_base):
     ''' Get the versions of R that can be used for SWAT '''
     r_base_vers = set()
 
-    out = conda_search(platform, 'r::{}-base'.format(r_base))
+    out = conda_search(platform, f'r::{r_base}-base')
 
     if not out:
         return []
 
     for item in out:
         ver = item['version']
-        if tuple([int(x) for x in ver.split('.')]) < (3, 4, 3):
+        if tuple(int(x) for x in ver.split('.')) < (3, 4, 3):
             continue
         # skip mro 3.5.1 due to build issues
-        if platform == "linux-64" and r_base == "mro" and tuple([int(x) for x in ver.split('.')]) == (3, 5, 1):
+        if (
+            platform == "linux-64"
+            and r_base == "mro"
+            and tuple(int(x) for x in ver.split('.')) == (3, 5, 1)
+        ):
             continue
 
         r_base_vers.add(item['version'])
@@ -197,7 +198,7 @@ def get_supported_versions(platform, r_base):
 
         pkg_vers = []
         for item in out:
-            rver = [x for x in item['depends'] if x.startswith('{}-base'.format(r_base))]
+            rver = [x for x in item['depends'] if x.startswith(f'{r_base}-base')]
 
             if not rver:
                 continue
@@ -233,7 +234,7 @@ def main(url, args):
 
     download = False
     if url.startswith('http:') or url.startswith('https:'):
-        print('> download %s' % url)
+        print(f'> download {url}')
         download = True
         url = urlretrieve(url)[0]
         urlcleanup()
@@ -253,14 +254,14 @@ def main(url, args):
 
         # Report available R versions
         print('')
-        print('> Available verions for {}:'.format(args.platform))
+        print(f'> Available verions for {args.platform}:')
         vers = dict(r=get_supported_versions(args.platform, 'r'),
                     mro=get_supported_versions(args.platform, 'mro'))
         for key, value in vers.items():
             if value:
-                print('  + {}-base'.format(key))
+                print(f'  + {key}-base')
                 for item in sorted(value):
-                    print('    {}'.format(item))
+                    print(f'    {item}')
         print('')
 
         # Make sure we aren't picking up any stray installed packages
@@ -277,18 +278,23 @@ def main(url, args):
 
                 # Only build for major.minor of r-base
                 if base == 'r':
-                    minor_ver = re.match(r'^(\d+\.\d+)', ver).group(1)
+                    minor_ver = re.match(r'^(\d+\.\d+)', ver)[1]
                     if minor_ver in r_base_finished:
                         continue
                     r_base_finished.add(minor_ver)
 
-                update_recipe(args.recipe_dir, url=url, version=get_version(url),
-                              r_base='{}-base'.format(base), r_version=ver)
+                update_recipe(
+                    args.recipe_dir,
+                    url=url,
+                    version=get_version(url),
+                    r_base=f'{base}-base',
+                    r_version=ver,
+                )
+
 
                 os.environ['R_VERSION'] = ver
 
-                cmd = ['conda', 'build', '-q']  # '--no-test'
-                cmd.extend(['--R', ver])
+                cmd = ['conda', 'build', '-q', *['--R', ver]]
                 if args.debug:
                     cmd.append('--debug')
                 if args.output_folder:

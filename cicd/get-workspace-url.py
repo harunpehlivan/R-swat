@@ -25,7 +25,7 @@ def main(args):
         workspace_url = 'file:///{}'.format(re.sub(r'^(/[A-Za-z])/', '\1:/',
                                             cwd.replace('\\', '/')))
     else:
-        workspace_url = 'file://{}'.format(cwd)
+        workspace_url = f'file://{cwd}'
 
     print(workspace_url)
 

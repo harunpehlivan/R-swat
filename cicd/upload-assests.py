@@ -41,21 +41,25 @@ def get_repo():
     ''' Retrieve the repo part of the git URL '''
     cmd = ['git', 'remote', 'get-url', 'origin']
     repo = subprocess.check_output(cmd).decode('utf-8').strip()
-    repo = re.search(r'github.com/(.+?)\.git$', repo).group(1)
+    repo = re.search(r'github.com/(.+?)\.git$', repo)[1]
     return repo
 
 
 def get_release(tag_name):
     ''' Retrieve the upload URL for the given tag '''
     res = requests.get(
-        'https://api.github.com/repos/{}/releases/tags/{}'.format(get_repo(), tag_name),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'))
+        f'https://api.github.com/repos/{get_repo()}/releases/tags/{tag_name}',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+    )
+
 
     if res.status_code < 400:
         return res.json()
 
-    raise RuntimeError('Could not locate tag name: {}'.format(tag_name))
+    raise RuntimeError(f'Could not locate tag name: {tag_name}')
 
 
 def upload_asset(url, filename):
@@ -65,24 +69,29 @@ def upload_asset(url, filename):
     POST :server/repos/:owner/:repo/releases/:release_id/assets?name=:asset_filename
 
     '''
-    upload_url = url + '?name={}'.format(quote(os.path.split(filename)[-1]))
+    upload_url = url + f'?name={quote(os.path.split(filename)[-1])}'
     with open(filename, 'rb') as asset_file:
         requests.post(
             upload_url,
-            headers={'Authorization': 'token {}'.format(GITHUB_TOKEN),
-                     'Accept': 'application/vnd.github.v3+json',
-                     'Content-Type': 'application/octet-stream'},
-            data=asset_file
+            headers={
+                'Authorization': f'token {GITHUB_TOKEN}',
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/octet-stream',
+            },
+            data=asset_file,
         )
 
 
 def delete_asset(asset_id):
     ''' Delete the resource at the given ID '''
     requests.delete(
-        'https://api.github.com/repos/{}/releases/assets/{}'.format(get_repo(), asset_id),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'),
-        json=dict(asset_id=asset_id))
+        f'https://api.github.com/repos/{get_repo()}/releases/assets/{asset_id}',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+        json=dict(asset_id=asset_id),
+    )
 
 
 def main(args):
@@ -99,7 +108,7 @@ def main(args):
             if args.force:
                 delete_asset(assets[filename]['id'])
             else:
-                print_err('WARNING: Asset already exists: {}'.format(asset))
+                print_err(f'WARNING: Asset already exists: {asset}')
                 continue
         upload_asset(upload_url, asset)
 
@@ -122,7 +131,7 @@ if __name__ == '__main__':
     try:
         sys.exit(main(args))
     except argparse.ArgumentTypeError as exc:
-        print_err('ERROR: {}'.format(exc))
+        print_err(f'ERROR: {exc}')
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(1)

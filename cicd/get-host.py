@@ -52,7 +52,7 @@ def main(args):
             else:
                 parts[i] = [part]
 
-        out += list(''.join(x) for x in itertools.product(*parts))
+        out += [''.join(x) for x in itertools.product(*parts)]
 
     print(random.choice(out))
 
