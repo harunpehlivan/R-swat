@@ -31,13 +31,12 @@ def main(args):
     init = glob.glob(os.path.join(args.root, 'DESCRIPTION'))[0]
     with open(init, 'r') as init_in:
         for line in init_in:
-            m = re.search(r'''^Version\s*:\s*(\S+)''', line)
-            if m:
-                version = m.group(1)
+            if m := re.search(r'''^Version\s*:\s*(\S+)''', line):
+                version = m[1]
 
     if version:
         if args.as_expr:
-            print('=={}'.format(version))
+            print(f'=={version}')
         else:
             print(version)
         return

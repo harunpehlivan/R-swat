@@ -60,7 +60,7 @@ def extract_highlights(version):
     txt = []
     with open('CHANGELOG.md', 'r') as in_file:
         for line in in_file:
-            if not re.match(r'##\s+{}'.format(version), line):
+            if not re.match(f'##\\s+{version}', line):
                 continue
             for line in in_file:
                 line = line.strip()
@@ -76,7 +76,7 @@ def get_repo():
     ''' Retrieve the repo part of the git URL '''
     cmd = ['git', 'remote', 'get-url', 'origin']
     repo = subprocess.check_output(cmd).decode('utf-8').strip()
-    repo = re.search(r'github.com[/:](.+?)\.git$', repo).group(1)
+    repo = re.search(r'github.com[/:](.+?)\.git$', repo)[1]
     return repo
 
 
@@ -89,8 +89,10 @@ def create_release(version, tag_name, target_commitish, name=None,
 
     '''
     with open('DESCRIPTION', 'r') as in_file:
-        pkg_name = re.search(r'^\s*Package\s*:\s*(\S+)',
-                             in_file.read(), flags=re.M).group(1)
+        pkg_name = re.search(
+            r'^\s*Package\s*:\s*(\S+)', in_file.read(), flags=re.M
+        )[1]
+
 
     if '.9000' in version:
         body = '(Development snapshot)'
@@ -101,14 +103,21 @@ def create_release(version, tag_name, target_commitish, name=None,
             name=(name or tag_name).format(tag=tag_name, version=version))
 
     res = requests.post(
-        'https://api.github.com/repos/{}/releases'.format(get_repo()),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'),
-        json=dict(tag_name=tag_name,
-                  target_commitish=target_commitish,
-                  name=(name or tag_name).format(tag=tag_name, version=version),
-                  body=body, draft=draft, prerelease=prerelease)
+        f'https://api.github.com/repos/{get_repo()}/releases',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+        json=dict(
+            tag_name=tag_name,
+            target_commitish=target_commitish,
+            name=(name or tag_name).format(tag=tag_name, version=version),
+            body=body,
+            draft=draft,
+            prerelease=prerelease,
+        ),
     )
+
 
     if res.status_code >= 400:
         raise RuntimeError(res.json())
@@ -122,21 +131,23 @@ def create_release(version, tag_name, target_commitish, name=None,
 def upload_assets(url, assets):
     ''' Upload assets to the release '''
     for asset in assets:
-        print(' > {}'.format(asset))
-        upload_url = url + '?name={}'.format(quote(os.path.split(asset)[-1]))
+        print(f' > {asset}')
+        upload_url = url + f'?name={quote(os.path.split(asset)[-1])}'
         with open(asset, 'rb') as asset_file:
             requests.post(
                 upload_url,
-                headers={'Authorization': 'token {}'.format(GITHUB_TOKEN),
-                         'Accept': 'application/vnd.github.v3+json',
-                         'Content-Type': 'application/octet-stream'},
-                data=asset_file
+                headers={
+                    'Authorization': f'token {GITHUB_TOKEN}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/octet-stream',
+                },
+                data=asset_file,
             )
 
 
 def next_version(version):
     ''' Return the next dev version number '''
-    return version + '.9000'
+    return f'{version}.9000'
 
 
 def edit_changelog(version):
@@ -148,9 +159,13 @@ def edit_changelog(version):
 
     if '.9000' not in version and version not in txt:
         date = datetime.date.today().strftime('%Y-%m-%d')
-        txt = re.sub(r'(#\s+Change\s+Log\s+)',
-                     r'\1## {} - {}\n\n- \n\n'.format(version, date),
-                     txt, flags=re.I)
+        txt = re.sub(
+            r'(#\s+Change\s+Log\s+)',
+            f'\\1## {version} - {date}\\n\\n- \\n\\n',
+            txt,
+            flags=re.I,
+        )
+
         with open(filename, 'w') as out_file:
             out_file.write(txt)
 
@@ -161,7 +176,7 @@ def edit_changelog(version):
     with open(filename, 'r') as in_file:
         txt = in_file.read().strip()
         if not txt:
-            raise RuntimeError('{} is empty'.format(filename))
+            raise RuntimeError(f'{filename} is empty')
 
     git_add(filename)
 
@@ -175,8 +190,14 @@ def set_version(version):
             txt = in_file.read()
         with open(f, 'w') as out_file:
             out_file.write(
-                re.sub(r'^(\s*Version\s*:\s*)\S+(\s*)$',
-                       r'\g<1>{}\g<2>'.format(version), txt, flags=re.M))
+                re.sub(
+                    r'^(\s*Version\s*:\s*)\S+(\s*)$',
+                    f'\\g<1>{version}\\g<2>',
+                    txt,
+                    flags=re.M,
+                )
+            )
+
         git_add(f)
 
 
@@ -189,8 +210,7 @@ def git_add(filename):
 def git_commit(message):
     ''' Commit changes '''
     cmd = ['git', 'diff', '--name-only', '--cached']
-    txt = subprocess.check_output(cmd).decode('utf-8').strip()
-    if txt:
+    if txt := subprocess.check_output(cmd).decode('utf-8').strip():
         cmd = ['git', 'commit', '-m', message]
         subprocess.check_call(cmd)
     cmd = ['git', 'log', '-1', '--format=%H']
@@ -234,23 +254,31 @@ def get_version():
     ''' Get package version number '''
     with open('DESCRIPTION', 'r') as in_file:
         txt = in_file.read()
-        return re.search(r'^\s*Version\s*:\s*(\S+)', txt, re.M).group(1)
+        return re.search(r'^\s*Version\s*:\s*(\S+)', txt, re.M)[1]
 
 
 def delete_release(tag_name):
     ''' Remove local and remote tags for the given release '''
     # Delete release
     res = requests.get(
-        'https://api.github.com/repos/{}/releases/tags/{}'.format(get_repo(), tag_name),
-        headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                     Accept='application/vnd.github.v3+json'))
+        f'https://api.github.com/repos/{get_repo()}/releases/tags/{tag_name}',
+        headers=dict(
+            Authorization=f'token {GITHUB_TOKEN}',
+            Accept='application/vnd.github.v3+json',
+        ),
+    )
+
 
     if res.status_code < 400:
         release_url = res.json()['url']
         res = requests.delete(
             release_url,
-            headers=dict(Authorization='token {}'.format(GITHUB_TOKEN),
-                         Accept='application/vnd.github.v3+json'))
+            headers=dict(
+                Authorization=f'token {GITHUB_TOKEN}',
+                Accept='application/vnd.github.v3+json',
+            ),
+        )
+
 
     # Delete tags
     cmd = ['git', 'show-ref', '--tags']
@@ -260,7 +288,7 @@ def delete_release(tag_name):
         if tag == tag_name:
             cmd = ['git', 'tag', '-d', tag]
             subprocess.check_call(cmd)
-            cmd = ['git', 'push', 'origin', ':refs/tags/{}'.format(tag)]
+            cmd = ['git', 'push', 'origin', f':refs/tags/{tag}']
             subprocess.check_call(cmd)
             break
 
@@ -287,13 +315,13 @@ def main(args):
     if args.snapshot:
         version = get_version()
         version = [int(x) for x in re.sub(r'\.9000$', r'', version).split('.')]
-        version = '{}.{}.{}'.format(version[0], version[1], version[2] + 1)
-        tag = 'v{}-snapshot'.format(version)
+        version = f'{version[0]}.{version[1]}.{version[2] + 1}'
+        tag = f'v{version}-snapshot'
         sha = get_head_sha()
 
     else:
         version = args.version or get_version()
-        tag = 'v{}-rc'.format(version)
+        tag = f'v{version}-rc'
 
         # Make file changes for release
         if args.version:
@@ -311,7 +339,7 @@ def main(args):
             return 2
 
         print('\nNOTE: Committing changes and creating release.\n')
-        sha = git_commit('Create {} release candidate.'.format(tag))
+        sha = git_commit(f'Create {tag} release candidate.')
 
     # Push release
     delete_release(tag)

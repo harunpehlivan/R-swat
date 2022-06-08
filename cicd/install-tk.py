@@ -19,6 +19,7 @@ order.
 
 '''
 
+
 import argparse
 import io
 import json
@@ -53,22 +54,30 @@ TK_PKGS = [
 ]
 
 # File patterns that should be excluded from the installation
-TK_EXCLUDES = [re.compile('^' + x + '$', flags=re.I) for x in [
-    r'mkl_.+\.(so|dll)',
-    r'libmkl_custom\.(so|dll)',
-    r'tkclang\.(so|dll)',
-    r'xorgpkg\.(so|dll)',
-    r't[0-9][a-z][0-9](de|es|ja|zh|zt|ko|it|pl|fr)\.(so|dll)',
-    r'(htclient|httplogin|.*arrow.*|libpaquet|libtkcpp).(so|dll)',
-    r'(tkcasl|tkconsul|tkcudajit|tkhttpc?|tkek8s|tkmgpu|tkscript).(so|dll)',
-]]
+TK_EXCLUDES = [
+    re.compile(f'^{x}$', flags=re.I)
+    for x in [
+        r'mkl_.+\.(so|dll)',
+        r'libmkl_custom\.(so|dll)',
+        r'tkclang\.(so|dll)',
+        r'xorgpkg\.(so|dll)',
+        r't[0-9][a-z][0-9](de|es|ja|zh|zt|ko|it|pl|fr)\.(so|dll)',
+        r'(htclient|httplogin|.*arrow.*|libpaquet|libtkcpp).(so|dll)',
+        r'(tkcasl|tkconsul|tkcudajit|tkhttpc?|tkek8s|tkmgpu|tkscript).(so|dll)',
+    ]
+]
+
 
 # File patterns that should be included in the installation
-TK_INCLUDES = [re.compile('^' + x + '$', flags=re.I) for x in [
-    r'.+\.so',
-    r'.+\.dll',
-    r'.+\.dylib',
-]]
+TK_INCLUDES = [
+    re.compile(f'^{x}$', flags=re.I)
+    for x in [
+        r'.+\.so',
+        r'.+\.dll',
+        r'.+\.dylib',
+    ]
+]
+
 
 # Map of conda platform names to SAS platform names
 PLATFORM_MAP = {
@@ -108,20 +117,11 @@ def extract_zip(root, data):
 
             basename = os.path.basename(name)
 
-            # Filter unneeded files
-            exclude = True
-            for item in TK_INCLUDES:
-                if item.match(basename):
-                    exclude = False
-                    break
+            exclude = not any(item.match(basename) for item in TK_INCLUDES)
             if exclude:
                 continue
 
-            exclude = False
-            for item in TK_EXCLUDES:
-                if item.match(basename):
-                    exclude = True
-                    break
+            exclude = any(item.match(basename) for item in TK_EXCLUDES)
             if exclude:
                 continue
 
@@ -136,8 +136,12 @@ def update_tk_version(root, version):
     tk_file = os.path.join(root, 'DESCRIPTION')
     with open(tk_file, 'r') as tk_file_in:
         txt = tk_file_in.read()
-        txt = re.sub(r'(TKVersion\s*:\s*)(\S+)', r'\1{}'
-                     .format(re.sub(r'f$', r'', version)), txt)
+        txt = re.sub(
+            r'(TKVersion\s*:\s*)(\S+)',
+            f"\\1{re.sub(r'f$', r'', version)}",
+            txt,
+        )
+
     with open(tk_file, 'w') as tk_file_out:
         tk_file_out.write(txt)
 
@@ -176,8 +180,10 @@ def get_packages(lib_root, tk_base, release, platform, pkgs):
                 continue
 
             if resp.status_code != 200:
-                raise RuntimeError('{} code occurred during download of {}'
-                                   .format(resp.status_code, url))
+                raise RuntimeError(
+                    f'{resp.status_code} code occurred during download of {url}'
+                )
+
 
             print_err(url)
 

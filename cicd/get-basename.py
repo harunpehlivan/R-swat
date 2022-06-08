@@ -53,21 +53,19 @@ def main(args):
     init = glob.glob(os.path.join(args.root, 'DESCRIPTION'))[0]
     with open(init, 'r') as init_in:
         for line in init_in:
-            m = re.search(r'''^Version\s*:\s*(\S+)''', line)
-            if m:
-                version = m.group(1)
+            if m := re.search(r'''^Version\s*:\s*(\S+)''', line):
+                version = m[1]
 
-            m = re.search(r'''^TKVersion\s*:\s*(\S+)''', line)
-            if m:
-                tk_version = m.group(1)
+            if m := re.search(r'''^TKVersion\s*:\s*(\S+)''', line):
+                tk_version = m[1]
                 if tk_version == 'none':
                     tk_version = 'REST-only'
 
     if version:
         if args.full:
-            print('R-swat-{}+{}-{}'.format(version, tk_version, args.platform))
+            print(f'R-swat-{version}+{tk_version}-{args.platform}')
         else:
-            print('R-swat-{}'.format(version))
+            print(f'R-swat-{version}')
         return 0
 
     print_err('ERROR: Could not find DESCRIPTION file.')

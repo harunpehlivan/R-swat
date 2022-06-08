@@ -59,9 +59,7 @@ def expand_wildcards(vals):
             val = re.sub(r'\.?\*$', '', val)
             next_val = [int(x) for x in val.split('.')]
             next_val[-1] += 1
-            out.append('>={},<={}a0'.format(
-                val,
-                '.'.join('{}'.format(x) for x in next_val)))
+            out.append(f">={val},<={'.'.join(f'{x}' for x in next_val)}a0")
         else:
             out.append(val)
     return out
@@ -80,8 +78,8 @@ def check_version(pkg_ver, specs):
                     oper = '=='
                 elif oper == '':
                     oper = '>='
-                or_expr.append('{} {} {}'.format(pkg_ver, oper, version_key(ver)))
-            expr.append('({})'.format(' or '.join(or_expr)))
+                or_expr.append(f'{pkg_ver} {oper} {version_key(ver)}')
+            expr.append(f"({' or '.join(or_expr)})")
         if eval(' and '.join(expr)):
             return True
     return False
@@ -105,14 +103,14 @@ def get_supported_versions(platform, r_base):
     ''' Get the versions of R that can be used for SWAT '''
     r_base_vers = set()
 
-    out = conda_search(platform, 'r::{}-base'.format(r_base))
+    out = conda_search(platform, f'r::{r_base}-base')
 
     if not out:
         return []
 
     for item in out:
         ver = item['version']
-        if tuple([int(x) for x in ver.split('.')]) < (3, 4, 3):
+        if tuple(int(x) for x in ver.split('.')) < (3, 4, 3):
             continue
         r_base_vers.add(item['version'])
 
@@ -121,7 +119,7 @@ def get_supported_versions(platform, r_base):
 
         pkg_vers = []
         for item in out:
-            rver = [x for x in item['depends'] if x.startswith('{}-base'.format(r_base))]
+            rver = [x for x in item['depends'] if x.startswith(f'{r_base}-base')]
 
             if not rver:
                 continue
@@ -146,12 +144,12 @@ def main(args):
     info = dict(r=get_supported_versions(args.platform, 'r'),
                 mro=get_supported_versions(args.platform, 'mro'))
 
-    print('> Available versions for {}:'.format(args.platform))
+    print(f'> Available versions for {args.platform}:')
     for key, value in info.items():
         if value:
-            print('  + {}-base'.format(key))
+            print(f'  + {key}-base')
         for item in sorted(value):
-            print('    {}'.format(item))
+            print(f'    {item}')
 
     # Pick a subset of the matrix to test.
     subset = dict(r=set(), mro=set())
@@ -167,7 +165,7 @@ def main(args):
             subset['r'].add(random.choice(info['r'][1:-1]))
         print('  + r-base')
         for item in sorted(subset['r']):
-            print('    {}'.format(item))
+            print(f'    {item}')
 
     if info['mro']:
         subset['mro'].add(info['mro'][0])
@@ -176,41 +174,48 @@ def main(args):
             subset['mro'].add(random.choice(info['mro'][1:-1]))
         print('  + mro-base')
         for item in sorted(subset['mro']):
-            print('    {}'.format(item))
+            print(f'    {item}')
 
     # Generate Tox configurations for testenvs
     for pkg in ['conda']:
-        out = ['', '#', '# BEGIN GENERATED ENVIRONMENTS', '#', '']
-        out.append('[testenv:empty]')
-        out.append('commands =')
-        out.append('deps =')
-        out.append('conda_deps =')
-        out.append('')
+        out = [
+            '',
+            '#',
+            '# BEGIN GENERATED ENVIRONMENTS',
+            '#',
+            '',
+            '[testenv:empty]',
+            'commands =',
+            'deps =',
+            'conda_deps =',
+            '',
+        ]
 
         envlist = []
 
         for base, vers in sorted(subset.items()):
-            out.append('#')
-            out.append('# {}-base'.format(base))
-            out.append('#')
-            out.append('')
+            out.extend(('#', f'# {base}-base', '#', ''))
             for ver in sorted(vers):
-                out.append('# R {}'.format(ver))
+                out.append(f'# R {ver}')
 
-                name = '{}{}-{}-cicd'.format(base, ver.replace('.', ''), pkg)
+                name = f"{base}{ver.replace('.', '')}-{pkg}-cicd"
                 envlist.append(name)
-                out.append('[testenv:{}]'.format(name))
-                out.append('commands = {{[testenv:{}]commands}}'.format(pkg))
-                out.append('conda_deps =')
-                out.append('    {}-base=={}'.format(base, ver))
-                out.append('    {[testenv]conda_deps}')
-                out.append('')
+                out.extend(
+                    (
+                        f'[testenv:{name}]',
+                        'commands = {{[testenv:{}]commands}}'.format(pkg),
+                        'conda_deps =',
+                        f'    {base}-base=={ver}',
+                        '    {[testenv]conda_deps}',
+                        '',
+                    )
+                )
 
         # Write new Tox configuration
         with open(args.tox_ini, 'r') as tox_in:
             lines = iter(tox_in.readlines())
 
-        out_file = '{}-{}.ini'.format(os.path.splitext(args.tox_ini)[0], pkg)
+        out_file = f'{os.path.splitext(args.tox_ini)[0]}-{pkg}.ini'
         with open(out_file, 'w') as tox_out:
             for line in lines:
                 # Override envlist
@@ -218,8 +223,7 @@ def main(args):
                     tox_out.write('envlist =\n')
                     for item in envlist:
                         tox_out.write('    {}\n'.format(item))
-                    else:
-                        tox_out.write('    empty\n')
+                    tox_out.write('    empty\n')
                     for line in lines:
                         if not line.startswith(' '):
                             break
